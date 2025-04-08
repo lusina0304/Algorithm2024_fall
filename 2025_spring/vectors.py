@@ -3,17 +3,17 @@ from math import sqrt, sin, cos, atan2
 # def add(v1,v2):
 #     return (v1[0] + v2[0], v1[1] + v2[1])
 
-def subtract(v1,v2):
-    return (v1[0] - v2[0], v1[1] - v2[1])
+#def subtract(v1,v2):
+#    return (v1[0] - v2[0], v1[1] - v2[1])
 
-def add(*vectors):
-    return (sum([v[0] for v in vectors]), sum([v[1] for v in vectors]))
+#def add(*vectors):
+#    return (sum([v[0] for v in vectors]), sum([v[1] for v in vectors]))
 
 def length(v):
-    return sqrt(v[0]**2 + v[1]**2)
+    return sqrt(sum([coord ** 2 for coord in v]))
 
-def distance(v1,v2):
-    return length(subtract(v1,v2))
+#def distance(v1,v2):
+#    return length(subtract(v1,v2))
 
 def perimeter(vectors):
     distances = [distance(vectors[i], vectors[(i+1)%len(vectors)])
@@ -21,7 +21,7 @@ def perimeter(vectors):
     return sum(distances)
 
 def scale(scalar,v):
-    return (scalar * v[0], scalar * v[1])
+    return tuple([coord * scalar for coord in v])
 
 def to_cartesian(polar_vector):
     length, angle = polar_vector[0], polar_vector[1]
