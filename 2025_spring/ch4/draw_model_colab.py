@@ -40,6 +40,8 @@ def draw_model(faces, color_map=blues, light=(1,2,3),
                 glRotatefArgs=None,
                 get_matrix=None):
     pygame.init()
+    print('aaa')
+    print( pygame.display.list_modes() )
     display = (400,400)
     window = pygame.display.set_mode(display, DOUBLEBUF|OPENGL)
     cam = camera.default_camera
@@ -53,43 +55,81 @@ def draw_model(faces, color_map=blues, light=(1,2,3),
     glEnable(GL_DEPTH_TEST)
     glCullFace(GL_BACK)
 
-    while cam.is_shooting():
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                quit()
+    #while cam.is_shooting():
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            quit()
 
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
-        Axes()
-        glBegin(GL_TRIANGLES)
-        def do_matrix_transform(v):
-            if get_matrix:
-                m = get_matrix(pygame.time.get_ticks())
-                return multiply_matrix_vector(m, v)
-            else:
-                return v
-        transformed_faces = polygon_map(do_matrix_transform, faces)
-        for face in transformed_faces:
-            color = shade(face,color_map,light)
-            for vertex in face:
-                glColor3fv((color[0], color[1], color[2]))
-                glVertex3fv(vertex)
-        glEnd()
-        cam.tick()
-        pygame.display.flip()
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+    Axes()
+    glBegin(GL_TRIANGLES)
+    def do_matrix_transform(v):
+        if get_matrix:
+            m = get_matrix(pygame.time.get_ticks())
+            return multiply_matrix_vector(m, v)
+        else:
+            return v
+    transformed_faces = polygon_map(do_matrix_transform, faces)
+    for face in transformed_faces:
+        color = shade(face,color_map,light)
+        for vertex in face:
+            glColor3fv((color[0], color[1], color[2]))
+            glVertex3fv(vertex)
+    glEnd()
+    cam.tick()
+    pygame.display.flip()
 
 
-        #convert image so it can be displayed in OpenCV
-        view = pygame.surfarray.array3d(window)
+    #convert image so it can be displayed in OpenCV
+    view = pygame.surfarray.array3d(window)
 
-        #  convert from (width, height, channel) to (height, width, channel)
-        view = view.transpose([1, 0, 2])
+    #  convert from (width, height, channel) to (height, width, channel)
+    view = view.transpose([1, 0, 2])
 
-        #  convert from rgb to bgr
-        img_bgr = cv2.cvtColor(view, cv2.COLOR_RGB2BGR)
+    #  convert from rgb to bgr
+    img_bgr = cv2.cvtColor(view, cv2.COLOR_RGB2BGR)
 
-        #Display image, clear cell every 0.5 seconds
-        cv2_imshow(img_bgr)
+    #Display image, clear cell every 0.5 seconds
+    cv2_imshow(img_bgr)
+
+    # while cam.is_shooting():
+    #     for event in pygame.event.get():
+    #         if event.type == pygame.QUIT:
+    #             pygame.quit()
+    #             quit()
+
+    #     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+    #     Axes()
+    #     glBegin(GL_TRIANGLES)
+    #     def do_matrix_transform(v):
+    #         if get_matrix:
+    #             m = get_matrix(pygame.time.get_ticks())
+    #             return multiply_matrix_vector(m, v)
+    #         else:
+    #             return v
+    #     transformed_faces = polygon_map(do_matrix_transform, faces)
+    #     for face in transformed_faces:
+    #         color = shade(face,color_map,light)
+    #         for vertex in face:
+    #             glColor3fv((color[0], color[1], color[2]))
+    #             glVertex3fv(vertex)
+    #     glEnd()
+    #     cam.tick()
+    #     pygame.display.flip()
+
+
+    #     #convert image so it can be displayed in OpenCV
+    #     view = pygame.surfarray.array3d(window)
+
+    #     #  convert from (width, height, channel) to (height, width, channel)
+    #     view = view.transpose([1, 0, 2])
+
+    #     #  convert from rgb to bgr
+    #     img_bgr = cv2.cvtColor(view, cv2.COLOR_RGB2BGR)
+
+    #     #Display image, clear cell every 0.5 seconds
+    #     cv2_imshow(img_bgr)
 
         # Read the result
         #import matplotlib.pyplot as plt
