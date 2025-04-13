@@ -10,7 +10,7 @@ from transforms import *
 
 import OpenGL.GL as gl
 import numpy as np
-import lucid.misc.io.showing as show
+# import lucid.misc.io.showing as show
 
 def normal(face):
     return(cross(subtract(face[1], face[0]), subtract(face[2], face[0])))
