@@ -8,8 +8,11 @@ from vectors import *
 from math import *
 from transforms import *
 
-import OpenGL.GL as gl
-import numpy as np
+import cv2
+from google.colab.patches import cv2_imshow
+from google.colab import output
+# import OpenGL.GL as gl
+# import numpy as np
 # import lucid.misc.io.showing as show
 
 def normal(face):
@@ -75,7 +78,27 @@ def draw_model(faces, color_map=blues, light=(1,2,3),
         cam.tick()
         pygame.display.flip()
 
+
+        #convert image so it can be displayed in OpenCV
+        view = pygame.surfarray.array3d(window)
+
+        #  convert from (width, height, channel) to (height, width, channel)
+        view = view.transpose([1, 0, 2])
+
+        #  convert from rgb to bgr
+        img_bgr = cv2.cvtColor(view, cv2.COLOR_RGB2BGR)
+
+        #Display image, clear cell every 0.5 seconds
+        cv2_imshow(img_bgr)
+
         # Read the result
-        img_buf = gl.glReadPixelsub(0, 0, 400, 400, gl.GL_RGB, gl.GL_UNSIGNED_BYTE)
-        img = np.frombuffer(img_buf, np.uint8).reshape(400, 400, 3)[::-1]
-        show.image(img/255.0)
+        #import matplotlib.pyplot as plt
+        #plt.figure(figsize=(20,20))
+        
+
+        #img_buf = gl.glReadPixelsub(0, 0, 400, 400, gl.GL_RGB, gl.GL_UNSIGNED_BYTE)
+        #img = np.frombuffer(img_buf, np.uint8).reshape(400, 400, 3)[::-1]
+        # show.image(img/255.0)
+
+        # plt.imshow(color)
+        # plt.show()
