@@ -8,9 +8,6 @@ from vectors import *
 from math import *
 from transforms import *
 
-import cv2
-from matplotlib import pyplot as plt
-
 def normal(face):
     return(cross(subtract(face[1], face[0]), subtract(face[2], face[0])))
 
@@ -75,13 +72,13 @@ def draw_model(faces, color_map=blues, light=(1,2,3),
         cam.tick()
         pygame.display.flip()
 
-        #convert image so it can be displayed in OpenCV
-        view = pygame.surfarray.array3d(window)
-        #  convert from (width, height, channel) to (height, width, channel)
-        view = view.transpose([1, 0, 2])
-        #  convert from rgb to bgr
-        img_bgr = cv2.cvtColor(view, cv2.COLOR_RGB2BGR)
+        # #convert image so it can be displayed in OpenCV
+        # view = pygame.surfarray.array3d(window)
+        # #  convert from (width, height, channel) to (height, width, channel)
+        # view = view.transpose([1, 0, 2])
+        # #  convert from rgb to bgr
+        # img_bgr = cv2.cvtColor(view, cv2.COLOR_RGB2BGR)
 
-        plt.imshow(img_bgr)
-        # plt.title('my picture')
-        plt.show()
+        # plt.imshow(img_bgr)
+        # # plt.title('my picture')
+        # plt.show()
