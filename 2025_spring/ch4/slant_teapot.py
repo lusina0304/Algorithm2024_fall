@@ -10,7 +10,7 @@ def polygon_map(transformation, polygons):
 
 def slant_xy(vector):
     x,y,z = vector
-    return (x+y, y, z)
+    return (x, x+y, z)
 
 ####################################################################
 #### this code takes a snapshot to reproduce the exact figure 

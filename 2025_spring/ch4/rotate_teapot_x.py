@@ -33,4 +33,4 @@ if '--snapshot' in sys.argv:
     camera.default_camera = camera.Camera('fig_4.12_rotate_teapot_x',[0])
 ####################################################################
 
-draw_model(polygon_map(rotate_x_by(pi/2.), load_triangles()))
+draw_model(polygon_map(rotate_x_by(pi/4.), load_triangles()))
