@@ -62,6 +62,13 @@ class PolygonModel():
 
         # return cross_points
 
+    def does_intersect_with_poly(self, poly):
+        for segment in self.segments():
+            if poly.does_intersect(segment):
+                return True
+        return False
+
+
 class Ship(PolygonModel):
     def __init__(self):
         super().__init__([(0.5,0), (-0.25,0.25), (-0.25,-0.25)])
@@ -127,6 +134,10 @@ def draw_segment(screen, v1,v2, center, color=RED):
 
 screenshot_mode = False
 
+
+pygame.font.init()
+myFont = pygame.font.SysFont( "arial", 30, True, False)
+
 # INITIALIZE GAME ENGINE
 
 def main():
@@ -145,6 +156,8 @@ def main():
     # p key prints screenshot (you can ignore this variable)
     p_pressed = False
 
+    game_over = False
+
     while not done:
 
         clock.tick()
@@ -157,6 +170,35 @@ def main():
 
         milliseconds = clock.get_time()
         keys = pygame.key.get_pressed()
+
+        if game_over == True:
+            screen.fill(WHITE)
+
+            for asteroid in asteroids:
+                draw_poly(screen, asteroid, (ship.x, ship.y), color=GREEN)
+
+            BLACK = ( 0, 0, 0 )
+            render_text = myFont.render("GAME OVER", True, BLACK)
+
+            text_Rect = render_text.get_rect()
+            text_Rect.centerx = round(width / 2)
+            text_Rect.y = 50
+            
+            screen.blit(render_text, text_Rect)
+
+            if keys[pygame.K_r]:
+                for ast in asteroids:
+                    ast.x = randint(-9,9)
+                    ast.y = randint(-9,9)
+
+                ship.vx = 0
+                ship.vy = 0
+                    
+                game_over = False
+            
+            pygame.display.flip()
+            
+            continue
 
         for ast in asteroids:
             ast.move(milliseconds)
@@ -201,11 +243,16 @@ def main():
 
         draw_poly(screen,ship, (ship.x, ship.y))
 
+        speed = (ship.vx, ship.vy)
+
         for asteroid in asteroids:
             if keys[pygame.K_SPACE] and asteroid.does_intersect(laser):
                 # asteroids.remove(asteroid)
-                                
-                unit_dir = vectors.unit((ship.vx, ship.vy))
+                
+                if vectors.length(speed) < 1e-16:
+                    speed = (1,0)
+
+                unit_dir = vectors.unit(speed)
                 angle = atan2(unit_dir[1], unit_dir[0]) + uniform(-pi/2, pi/2)
                 v_end = vectors.to_cartesian( (20. * sqrt(2), angle) )
 
@@ -220,7 +267,10 @@ def main():
             v_ast = vectors.add((asteroid.x, asteroid.y), vectors.scale(-1, (ship.x, ship.y)))
 
             if v_ast[0] < -10 or v_ast[0] > 10 or v_ast[1] < -10 or v_ast[1] > 10:
-                unit_dir = vectors.unit((ship.vx, ship.vy))
+                if vectors.length(speed) < 1e-16:
+                    speed = (1,0)
+
+                unit_dir = vectors.unit(speed)
                 angle = atan2(unit_dir[1], unit_dir[0]) + uniform(-pi/2, pi/2)
                 v_end = vectors.to_cartesian( (20. * sqrt(2), angle) )
 
@@ -232,8 +282,18 @@ def main():
                 asteroid.x = cross[0] + ship.x
                 asteroid.y = cross[1] + ship.y
 
+            #check intersect with ship
+            if asteroid.does_intersect_with_poly(ship):
+                game_over = True
+
+
+
+
 
         pygame.display.flip()
+
+
+
 
     pygame.quit()
 

@@ -8,9 +8,16 @@ import sys
 
 # DEFINE OBJECTS OF THE GAME
 
+def matrix_multiply(a,b):
+    return tuple(
+        tuple(vectors.dot(row,col) for col in zip(*b))
+        for row in a
+    )
+
 class PolygonModel():
-    def __init__(self,points):
-        self.points = points
+    def __init__(self,points): # [(0.5,0), (-0.25,0.25), (-0.25,-0.25)]
+        p = [(x, y, 1) for x, y in points]
+        self.points =tuple(zip(*p))
         self.rotation_angle = 0
         self.x = 0
         self.y = 0
@@ -19,9 +26,11 @@ class PolygonModel():
         self.angular_velocity = 0
 
     def transformed(self):
-        rotated = [vectors.rotate2d(self.rotation_angle, v) for v in self.points]
-        return [vectors.add((self.x,self.y),v) for v in rotated]
-
+        theta = self.rotation_angle
+        mat = (( cos(theta), -sin(theta), self.x ), ( sin(theta), cos(theta), self.y ), ( 0, 0, 1 ))
+        v_p = matrix_multiply(mat, self.points)
+        return [(x, y) for x, y, z in zip(*v_p)]
+    
     def move(self, milliseconds):
         dx, dy = self.vx * milliseconds / 1000.0, self.vy * milliseconds / 1000.0
         self.x, self.y = vectors.add((self.x,self.y), (dx,dy))
@@ -138,6 +147,26 @@ def main():
 
         if keys[pygame.K_RIGHT]:
             ship.rotation_angle -= milliseconds * (2*pi / 1000)
+
+        acc = 0
+
+        if keys[pygame.K_UP]:
+            acc = 3
+
+        if keys[pygame.K_DOWN]:
+            acc = -3
+
+        ship.vx += acc * cos(ship.rotation_angle) * milliseconds / 1000
+        ship.vy += acc * sin(ship.rotation_angle) * milliseconds / 1000
+
+        if ship.x <= -10 or ship.x >= 10:
+            ship.x = -ship.x
+
+        if ship.y <= -10 or ship.y >= 10:
+            ship.y = -ship.y
+
+        ship.move(milliseconds)
+
 
         laser = ship.laser_segment()
 
