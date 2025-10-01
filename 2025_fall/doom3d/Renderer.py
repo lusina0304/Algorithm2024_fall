@@ -5,7 +5,8 @@ from typing import Optional, Tuple
 
 import Config
 from Linalg import perspective, translate, scale
-from Config import WIDTH, HEIGHT, FOV_DEG, NEAR, FAR, VSYNC, IMAGE_Y_FLIP
+# from Config import WIDTH, HEIGHT, FOV_DEG, NEAR, FAR, VSYNC, IMAGE_Y_FLIP
+# from Config import width as WIDTH, height as HEIGHT, fov_deg as FOV_DEG, near as NEAR, far as FAR, vsync as VSYNC, image_y_flip as IMAGE_Y_FLIP
 
 # =========================
 # Renderer (walls: instanced cubes; floor/ceiling: large planes; sprites: billboards)
@@ -87,12 +88,14 @@ HUD_FS = TEX_FS
 
 class Renderer:
     def __init__(self, config:Config):
+        self.cfg = config
+
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
-        if VSYNC:
+        if config.vsync:
             pygame.display.gl_set_attribute(pygame.GL_SWAP_CONTROL, 1)
-        pygame.display.set_mode((WIDTH, HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF)
+        pygame.display.set_mode((config.width, config.height), pygame.OPENGL | pygame.DOUBLEBUF)
         self.ctx = moderngl.create_context()
         self.ctx.enable(moderngl.DEPTH_TEST)
 
@@ -111,12 +114,12 @@ class Renderer:
         self._init_hud_geo()
 
         # Projection
-        aspect = WIDTH / HEIGHT
-        self.P = perspective(FOV_DEG, aspect, NEAR, FAR)
+        aspect = config.width / config.height
+        self.P = perspective( config.fov_deg, aspect, config.near, config.far)
 
-        # Textures
+        # Textures assets\texture\wall
         self.white = self._make_white()
-        self.tex_wall  = self._load_texture("assets/texture_wall.png", allow_alpha=False) or self.white
+        self.tex_wall  = self._load_texture("assets/texture/2.png", allow_alpha=False) or self.white
         self.tex_floor = self._load_texture("assets/texture_floor.png", allow_alpha=False) or self.white
         self.tex_enemy = self._load_texture("assets/texture_enemy.png", allow_alpha=True) or self.white
         self.tex_weapon= self._load_texture("assets/texture_weapon.png", allow_alpha=True) or self.white
@@ -135,7 +138,7 @@ class Renderer:
                 surf = surf.convert_alpha(); mode="RGBA"; comps=4
             else:
                 surf = surf.convert(); mode="RGB"; comps=3
-            if IMAGE_Y_FLIP:
+            if self.cfg.image_y_flip:
                 surf = pygame.transform.flip(surf, False, True)
             img = pygame.image.tostring(surf, mode, False)
             tex = self.ctx.texture(surf.get_size(), comps, img)
@@ -202,7 +205,7 @@ class Renderer:
         self.vao_hud = self.ctx.vertex_array(self.prog_hud, [(self.vbo_hud,'2f 2f','in_pos','in_uv')])
 
     def begin_frame(self):
-        self.ctx.viewport = (0,0,WIDTH,HEIGHT)
+        self.ctx.viewport = (0,0,self.cfg.width,self.cfg.height)
         self.ctx.clear(0.05,0.08,0.1)
         self.ctx.enable(moderngl.DEPTH_TEST)
 

@@ -28,10 +28,9 @@ import pygame
 import math
 # import moderngl
 
-import Renderer
-import Config
-import Level
-#import Player
+from Renderer import Renderer
+from Config import Config
+from Level import Level
 from Player import Player, Enemy
 from Linalg import look_yaw_pitch, perspective, translate, scale, normalize
 
@@ -68,15 +67,13 @@ LEVEL_STR = [
 # =========================
 class Game:
     def __init__(self):
-
-        # Config
         self.cfg = Config()
 
         pygame.init()
         pygame.event.set_grab(True)
         pygame.mouse.set_visible(False)
 
-        self.render = Renderer()
+        self.render = Renderer(self.cfg)
         self.clock = pygame.time.Clock()
 
         # Level

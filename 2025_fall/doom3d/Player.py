@@ -4,7 +4,7 @@ import numpy as np
 import math
 
 import Level
-import Linalg
+from Linalg import normalize
 
 # =========================
 # Game objects
@@ -33,9 +33,10 @@ class Player:
             for ox in (0,1):
                 tx, tz = int(math.floor(p[0]+(ox-0.5)*2*radius)), int(math.floor(p[2]+(oy-0.5)*2*radius))
                 if level.is_solid(tx, tz):
+                    return True
                     # simple square check
-                    if abs((tx+0.5)-p[0]) < 0.5+radius and abs((tz+0.5)-p[2]) < 0.5+radius:
-                        return True
+                    # if abs((tx+0.5)-p[0]) < 0.5+radius and abs((tz+0.5)-p[2]) < 0.5+radius:
+                    #     return True
         return False
 
 @dataclass
