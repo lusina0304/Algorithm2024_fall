@@ -96,6 +96,7 @@ class Renderer:
         if config.vsync:
             pygame.display.gl_set_attribute(pygame.GL_SWAP_CONTROL, 1)
         pygame.display.set_mode((config.width, config.height), pygame.OPENGL | pygame.DOUBLEBUF)
+        
         self.ctx = moderngl.create_context()
         self.ctx.enable(moderngl.DEPTH_TEST)
 
