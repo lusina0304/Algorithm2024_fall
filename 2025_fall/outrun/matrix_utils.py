@@ -4,9 +4,9 @@ import math
 def create_translation_matrix(x, y, z):
     """이동 행렬 생성"""
     matrix = np.identity(4, dtype=np.float32)
-    matrix[3, 0] = x
-    matrix[3, 1] = y
-    matrix[3, 2] = z
+    matrix[0, 3] = x
+    matrix[1, 3] = y
+    matrix[2, 3] = z
     return matrix
 
 def create_rotation_x_matrix(angle):
@@ -98,7 +98,7 @@ def create_view_matrix(camera_pos, yaw, pitch):
     # 회전 (카메라 회전의 역)
     view = create_rotation_y_matrix(-yaw) @ view
     view = create_rotation_x_matrix(-pitch) @ view
-
+    
     return view
 
 def create_projection_matrix(fov_degrees, aspect_ratio, near, far):

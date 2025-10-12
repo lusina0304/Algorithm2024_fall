@@ -5,6 +5,7 @@ from OpenGL.GL.shaders import compileProgram, compileShader
 import numpy as np
 from PIL import Image
 from matrix_utils import create_model_matrix, create_view_matrix, create_projection_matrix, create_ortho_matrix
+import math
 
 # 화면 설정
 SCREEN_WIDTH = 1024
@@ -20,9 +21,6 @@ out vec2 TexCoord;
 
 uniform mat4 mvp;
 
-// uniform mat4 model;
-// uniform mat4 view;
-// uniform mat4 projection;
 
 void main()
 {
@@ -44,7 +42,35 @@ void main()
 {
     vec4 texColor = texture(texture1, TexCoord);
     FragColor = texColor * vec4(tintColor, 1.0);
-    //FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+}
+"""
+
+# Line Vertex Shader (위치와 색상을 VBO에서 입력받음)
+LINE_VERTEX_SHADER = """
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aColor;
+
+out vec3 vertexColor;
+
+uniform mat4 mvp;
+
+void main()
+{
+    gl_Position = mvp * vec4(aPos, 1.0);
+    vertexColor = aColor;
+}
+"""
+
+# Line Fragment Shader (정점 색상 사용)
+LINE_FRAGMENT_SHADER = """
+#version 330 core
+in vec3 vertexColor;
+out vec4 FragColor;
+
+void main()
+{
+    FragColor = vec4(vertexColor, 1.0);
 }
 """
 
@@ -133,35 +159,34 @@ def create_cube_vao():
 
     return VAO
 
-def generate_cube(cube_vao, wall_textures, shader):
-    """2D 그리드로부터 3D 지형 생성 및 렌더링"""
-    # model_loc = glGetUniformLocation(shader, "model")
-    # tint_loc = glGetUniformLocation(shader, "tintColor")
+def draw_axis():
+    vertices = np.array([
+        0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+        1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+        0.0, 1.0, 0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        0.0, 0.0, 1.0, 0.0, 0.0, 1.0
+    ], dtype=np.float32)
 
+    VAO = glGenVertexArrays(1)
+    VBO = glGenBuffers(1)
 
-    # # 바닥 그리기
-    # glBindVertexArray(quad_vao)
-    # glBindTexture(GL_TEXTURE_2D, floor_texture)
-    # glUniform3f(tint_loc, 1.0, 1.0, 1.0)
+    glBindVertexArray(VAO)
 
-    # # 바닥을 XZ 평면에 그리기
-    # model = create_model_matrix(len(grid[0]) / 2, 0, len(grid) / 2, scale=len(grid) * 2, rotate_x=-90)
-    # glUniformMatrix4fv(model_loc, 1, GL_FALSE, model)
-    # glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
+    glBindBuffer(GL_ARRAY_BUFFER, VBO)
+    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
 
-    # 벽 그리기
-    glBindVertexArray(cube_vao)
-    # for z in range(len(grid)):
-    #     for x in range(len(grid[0])):
-    #         wall_type = grid[z][x]
-    #         if wall_type != 0:
-    wall_type = 1
-    glBindTexture(GL_TEXTURE_2D, wall_textures[wall_type])
-    glUniform3f(tint_loc, 1.0, 1.0, 1.0)
-    model = create_model_matrix(0, 0, 0, scale=1.0)
-    # glUniformMatrix4fv(model_loc, 1, GL_FALSE, model)
-    glUniformMatrix4fv(model_loc, 1, GL_TRUE, model)
-    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, None)
+    # 위치
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * 4, ctypes.c_void_p(0))
+    glEnableVertexAttribArray(0)
+    # 색상
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * 4, ctypes.c_void_p(3 * 4))
+    glEnableVertexAttribArray(1)
+
+    glBindVertexArray(0)
+
+    return VAO
 
 def main():
     pygame.init()
@@ -180,8 +205,15 @@ def main():
         compileShader(FRAGMENT_SHADER, GL_FRAGMENT_SHADER)
     )
 
+    # 라인 셰이더 컴파일
+    line_shader = compileProgram(
+        compileShader(LINE_VERTEX_SHADER, GL_VERTEX_SHADER),
+        compileShader(LINE_FRAGMENT_SHADER, GL_FRAGMENT_SHADER)
+    )
+
     # VAO 생성
     cube_vao = create_cube_vao()
+    axis_vao = draw_axis()
 
     # 텍스처 로드
     wall_textures = {
@@ -192,8 +224,18 @@ def main():
     # floor_texture = load_texture("textures/floor.png")
 
     # 투영 행렬
-    projection = create_projection_matrix(60, SCREEN_WIDTH / SCREEN_HEIGHT, 0.1, 50.0)
-    # projection = create_ortho_matrix(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT, 0.01, 100)
+    fov = math.radians(60)
+    aspect = SCREEN_WIDTH / SCREEN_HEIGHT
+    near, far = 0.1, 50.0
+
+    # f = 1.0 / math.tan(fov / 2.0)
+    # projection = np.array([
+    #     [f / aspect, 0, 0, 0],
+    #     [0, f, 0, 0],
+    #     [0, 0, (far + near) / (near - far), (2 * far * near) / (near - far)],
+    #     [0, 0, -1, 0]
+    # ], dtype=np.float32)
+    projection = create_projection_matrix(fov, aspect, near, far)
 
     # 카메라 설정
     camera_x = 0
@@ -203,14 +245,17 @@ def main():
     camera_pitch = 0
     camera_speed = 0.1
 
-    # 유니폼 위치
-    # view_loc = glGetUniformLocation(shader, "view")
-    # proj_loc = glGetUniformLocation(shader, "projection")
-
     mvp_loc = glGetUniformLocation(shader, "mvp")
+    tint_loc = glGetUniformLocation(shader, "tintColor")
+
+    # 유니폼 위치 (라인 셰이더)
+    line_mvp_loc = glGetUniformLocation(line_shader, "mvp")
 
     clock = pygame.time.Clock()
     running = True
+
+    # 회전 각도 초기화
+    rotation_angle = 0.0
 
     while running:
         for event in pygame.event.get():
@@ -246,10 +291,13 @@ def main():
             camera_yaw += 1
         if keys[pygame.K_UP]:
             camera_pitch += 1
-            camera_pitch = min(189, camera_pitch)
+            camera_pitch = min(89, camera_pitch)
         if keys[pygame.K_DOWN]:
             camera_pitch -= 1
-            camera_pitch = max(-189, camera_pitch)
+            camera_pitch = max(-89, camera_pitch)
+
+        # 회전 각도 업데이트 (시간에 따라 증가)
+        rotation_angle += 1.0  # 매 프레임마다 1도씩 증가
 
         # 뷰 행렬 업데이트
         camera_pos = (camera_x, camera_y, camera_z)
@@ -259,13 +307,44 @@ def main():
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glUseProgram(shader)
 
-        glUniformMatrix4fv(view_loc, 1, GL_TRUE, view)
-        glUniformMatrix4fv(proj_loc, 1, GL_TRUE, projection)
 
-        
+        glBindVertexArray(cube_vao)
+        # for z in range(len(grid)):
+        #     for x in range(len(grid[0])):
+        #         wall_type = grid[z][x]
+        #         if wall_type != 0:
+        wall_type = 1
+        glBindTexture(GL_TEXTURE_2D, wall_textures[wall_type])
+        glUniform3f(tint_loc, 1.0, 1.0, 1.0)
+        # X, Y 축으로 회전하는 모델 행렬
+        # model = create_model_matrix(0, 0, 0, scale=1.0, rotate_x=rotation_angle, rotate_y=rotation_angle)
+        model = create_model_matrix(0, 0, 0, scale=1.0, rotate_x=rotation_angle)
+
+        mvp = projection @ view @ model
+
+        glUniformMatrix4fv(mvp_loc, 1, GL_TRUE, mvp)
+
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, None)
+
+        # 축 렌더링 (라인 셰이더 사용)
+        glUseProgram(line_shader)
+        glBindVertexArray(axis_vao)
+        glLineWidth(3.0)
+
+        # 축은 원점에 고정
+        axis_model = create_model_matrix(0, 0, 0, scale=3.0)
+        axis_mvp = projection @ view @ axis_model
+
+        glUniformMatrix4fv(line_mvp_loc, 1, GL_TRUE, axis_mvp)
+        glDrawArrays(GL_LINES, 0, 6)  # 3개의 축, 각 2개의 정점
+
+        # glUniformMatrix4fv(view_loc, 1, GL_TRUE, view)
+        # glUniformMatrix4fv(proj_loc, 1, GL_TRUE, projection)
+
+
 
         # 지형 생성 및 렌더링
-        generate_cube(cube_vao, wall_textures, shader)
+        # generate_cube(cube_vao, wall_textures, shader)
 
         pygame.display.flip()
         clock.tick(60)
