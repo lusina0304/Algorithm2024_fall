@@ -4,7 +4,9 @@ from OpenGL.GL import *
 from OpenGL.GL.shaders import compileProgram, compileShader
 import numpy as np
 from PIL import Image
-from matrix_utils import create_model_matrix, create_view_matrix, create_projection_matrix, create_ortho_matrix
+from matrix_utils import create_model_matrix, \
+create_view_matrix, create_projection_matrix, \
+create_ortho_matrix, normalize
 import math
 
 # 화면 설정
@@ -54,6 +56,8 @@ uniform vec3 tintColor;
 void main()
 {
     vec4 texColor = texture(texture1, TexCoord);
+    if (texColor.a < 0.1)
+        discard;
     FragColor = texColor * vec4(tintColor, 1.0);
 }
 """
@@ -117,8 +121,8 @@ uniform float alpha;
 void main()
 {
     vec4 texColor = texture(texture1, TexCoord);
-    if (texColor.a < 0.1)
-        discard;
+    //if (texColor.a < 0.1)
+    //    discard;
     FragColor = vec4(texColor.rgb, texColor.a * alpha);
 }
 """
@@ -274,6 +278,117 @@ class Gun:
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
 
         glEnable(GL_DEPTH_TEST)
+
+class Enemy:
+    def __init__(self, x, y, z, textures, hp=100, speed=0.05, size=0.6, anim_speed=0.2):
+        """
+        적 클래스
+        :param x, y, z: 3D 공간상 위치
+        :param textures: 걷기 애니메이션 텍스처 리스트
+        :param hp: 체력
+        :param speed: 이동 속도
+        :param size: 스프라이트 크기
+        :param anim_speed: 애니메이션 속도 (초 단위로 프레임 전환 시간)
+        """
+        self.x = x
+        self.y = size / 2
+        self.z = z
+        self.textures = textures
+        self.hp = hp
+        # self.max_hp = hp
+        self.speed = speed
+        self.size = size
+        self.anim_speed = anim_speed
+        self.yaw = 0.0;
+
+        self.alive = True
+        self.current_frame = 0
+        self.anim_timer = 0.0
+
+    def take_damage(self, damage):
+        """피해 입기"""
+        if self.alive:
+            self.hp -= damage
+            if self.hp <= 0:
+                self.hp = 0
+                self.alive = False
+
+    def update(self, delta_time, player_pos, game_map):
+        """
+        적 업데이트 (AI, 애니메이션)
+        :param delta_time: 프레임 간 경과 시간 (초)
+        :param player_pos: 플레이어 위치 (x, y, z)
+        :param game_map: 맵 데이터 (충돌 체크용)
+        """
+        if not self.alive:
+            return
+
+        # 애니메이션 업데이트
+        self.anim_timer += delta_time
+        if self.anim_timer >= self.anim_speed:
+            self.anim_timer = 0.0
+            self.current_frame = (self.current_frame + 1) % len(self.textures)
+
+        # 플레이어를 향해 이동
+        dx = player_pos[0] - self.x
+        dz = player_pos[2] - self.z
+        distance = math.sqrt(dx * dx + dz * dz)
+
+        # 일정 거리 이상일 때만 추적
+        if distance > 0.5:
+            # 정규화된 방향으로 이동
+
+            # dx /= distance
+            # dz /= distance
+
+            # new_x = self.x + dx * self.speed
+            # new_z = self.z + dz * self.speed
+
+            # # 맵 충돌 체크
+            # map_x = int(new_x)
+            # map_z = int(new_z)
+
+            # if 0 <= map_x < len(game_map[0]) and 0 <= map_z < len(game_map):
+            #     if game_map[map_z][map_x] == 0:
+            #         self.x = new_x
+            #         self.z = new_z
+
+            direction = np.array(player_pos, np.float32) - np.array((self.x, self.y, self.z), np.float32)
+            direction[1] = 0.0
+            direction = normalize(direction)        
+            self.yaw = math.atan2(direction[2], direction[0])
+
+    def draw(self, quad_vao, shader):
+        """
+        적을 빌보드로 그리기 (항상 플레이어를 향함)
+        :param quad_vao: 쿼드 VAO
+        :param shader: 메인 셰이더 프로그램
+        :param player_yaw: 플레이어의 yaw 각도
+        """
+        if not self.alive:
+            return
+
+        # Uniform 위치 가져오기
+        model_loc = glGetUniformLocation(shader, "model")
+        tint_loc = glGetUniformLocation(shader, "tintColor")
+
+        # 현재 애니메이션 프레임 텍스처 바인딩
+        glBindTexture(GL_TEXTURE_2D, self.textures[self.current_frame])
+        glUniform3f(tint_loc, 1.0, 1.0, 1.0)
+        
+        # 빌보드 효과: 항상 플레이어를 향하도록 회전
+        model = create_model_matrix(
+            self.x,
+            self.y,
+            self.z,
+            scale=self.size,
+            rotate_y=math.degrees(self.yaw) - 90
+        )
+        glUniformMatrix4fv(model_loc, 1, GL_TRUE, model)
+
+        # 쿼드 렌더링
+        glBindVertexArray(quad_vao)
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
 
 def load_texture(filepath):
     """PNG 파일로부터 텍스처 로드"""
@@ -449,6 +564,33 @@ def draw_terrain_from_grid(grid, cube_vao, quad_vao, wall_textures, floor_textur
                 glUniformMatrix4fv(model_loc, 1, GL_TRUE, model)
                 glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, None)
 
+def check_hit(player, enemies):
+    """적 명중 체크"""
+    dir_x = math.sin(math.radians(player.yaw))
+    dir_z = -math.cos(math.radians(player.yaw))
+
+    for enemy in enemies:
+        if not enemy.alive:
+            continue
+
+        dx = enemy.x - player.x
+        dz = enemy.z - player.z
+        distance = math.sqrt(dx * dx + dz * dz)
+
+        if distance < 0.1:
+            continue
+
+        dx /= distance
+        dz /= distance
+
+        dot = dx * dir_x + dz * dir_z
+
+        if dot > 0.95 and distance < 10:
+            enemy.alive = False
+            return True
+
+    return False
+
 def main():
     pygame.init()
     pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), DOUBLEBUF | OPENGL)
@@ -490,12 +632,12 @@ def main():
         3: load_texture("textures/wall3.png"),
     }
     floor_texture = load_texture("textures/floor.png")
-    # enemy_textures = [
-    #     load_texture("textures/enemy_walk_1.png"),
-    #     load_texture("textures/enemy_walk_2.png"),
-    #     load_texture("textures/enemy_walk_3.png"),
-    #     load_texture("textures/enemy_walk_4.png")
-    # ]
+    enemy_textures = [
+        load_texture("textures/enemy_walk_1.png"),
+        load_texture("textures/enemy_walk_2.png"),
+        load_texture("textures/enemy_walk_3.png"),
+        load_texture("textures/enemy_walk_4.png")
+    ]
     gun_textures = [
         load_texture("textures/gun_idle.png"),
         load_texture("textures/gun_shoot1.png"),
@@ -507,10 +649,17 @@ def main():
     # Gun 인스턴스 생성 (발사 시간 0.3초)
     gun = Gun(gun_textures, fire_duration=0.3, size=(300, 300))
 
-    model_loc = glGetUniformLocation(shader, "model")
+    # Enemy 인스턴스 생성
+    enemies = [
+        Enemy(3.5, 0.5, 3.5, enemy_textures, hp=100, speed=0.02, size=0.6, anim_speed=0.2),
+        Enemy(5.5, 0.5, 5.5, enemy_textures, hp=100, speed=0.02, size=0.8, anim_speed=0.2),
+        Enemy(2.5, 0.5, 5.5, enemy_textures, hp=100, speed=0.02, size=0.9, anim_speed=0.2),
+    ]
+
+    # model_loc = glGetUniformLocation(shader, "model")
     view_loc = glGetUniformLocation(shader, "view")
     proj_loc = glGetUniformLocation(shader, "projection")
-    tint_loc = glGetUniformLocation(shader, "tintColor")
+    # tint_loc = glGetUniformLocation(shader, "tintColor")
     
 
     # 유니폼 위치 (라인 셰이더)
@@ -549,6 +698,11 @@ def main():
         # Gun 애니메이션 업데이트
         gun.update(delta_time)
 
+        # Enemy 업데이트
+        player_pos = (player.x, player.y, player.z)
+        for enemy in enemies:
+            enemy.update(delta_time, player_pos, MAP)
+
         view = player.get_view_matrix()
 
         # 렌더링
@@ -560,16 +714,13 @@ def main():
 
         draw_terrain_from_grid(MAP, cube_vao, quad_vao, wall_textures, floor_texture, shader)
 
-        # # 적 그리기 (빌보드)
-        # glBindVertexArray(quad_vao)
-        # for enemy in enemies:
-        #     if enemy.alive:
-        #         glBindTexture(GL_TEXTURE_2D, enemy_textures[enemy.anim_frame])
-        #         glUniform3f(tint_loc, 1.0, 1.0, 1.0)
-        #         model = create_model_matrix(enemy.x, enemy.y, enemy.z, scale=0.6, rotate_y=-player.yaw)
-        #         glUniformMatrix4fv(model_loc, 1, GL_TRUE, model)
-        #         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
-
+        # 적 그리기 (빌보드) - 거리순 정렬 (먼 것부터)
+        glBindVertexArray(quad_vao)
+        # enemies_sorted = sorted(enemies,
+        #                        key=lambda e: (e.x - player.x)**2 + (e.z - player.z)**2,
+        #                        reverse=True)
+        for enemy in enemies:
+            enemy.draw(quad_vao, shader)
 
         # 축 렌더링 (라인 셰이더 사용)
         glUseProgram(line_shader)
