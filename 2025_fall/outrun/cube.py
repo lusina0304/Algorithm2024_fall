@@ -40,7 +40,6 @@ void main()
 """
 
 def scale_matrix(s_x: float, s_y: float, s_z: float) -> npt.NDArray:
-    assert s_x > 0 and s_y > 0 and s_z > 0, "Input factors must be positive"
     return np.array([
         [s_x, 0.0, 0.0, 0.0],
         [0.0, s_y, 0.0, 0.0],
@@ -56,118 +55,51 @@ def translation_matrix(t_x: float, t_y: float, t_z: float) -> npt.NDArray:
         [0.0, 0.0, 0.0, 1.0]
     ])
 
-def rotation_matrix(
-    theta_x_deg: float = 0.0,
-    theta_x_rad: float = 0.0,
-    theta_y_deg: float = 0.0,
-    theta_y_rad: float = 0.0,
-    theta_z_deg: float = 0.0,
-    theta_z_rad: float = 0.0
-) -> npt.NDArray:
-    # convert inputs to radians
-    assert (theta_x_deg == 0.0) or (theta_x_rad == 0.0), (
-        "Either provide theta_x in degrees or radians, not both"
-    )
-    if theta_x_deg != 0.0:
-        theta_x_rad = theta_x_deg * np.pi / 180.0
+def rotation_x_matrix(rad) -> npt.NDArray:
+    c, s = math.cos(rad), math.sin(rad)
+    return np.array([
+        [1, 0, 0, 0],
+        [0, c, -s, 0],
+        [0, s, c, 0],
+        [0, 0, 0, 1]
+    ], dtype=np.float32)
 
-    assert (theta_y_deg == 0.0) or (theta_y_rad == 0.0), (
-        "Either provide theta_y in degrees or radians, not both"
-    )
-    if theta_y_deg != 0.0:
-        theta_y_rad = theta_y_deg * np.pi / 180.0
+def rotation_y_matrix(rad) -> npt.NDArray:
+    c, s = math.cos(rad), math.sin(rad)
+    return np.array([
+        [c, 0, -s, 0],
+        [0, 1, 0, 0],
+        [s, 0, c, 0],
+        [0, 0, 0, 1]
+    ], dtype=np.float32)
 
-    assert (theta_z_deg == 0.0) or (theta_z_rad == 0.0), (
-        "Either provide theta_z in degrees or radians, not both"
-    )
-    if theta_z_deg != 0.0:
-        theta_z_rad = theta_z_deg * np.pi / 180.0
-
-    # init identity matrix to handle no rotation
-    rot_matrix = np.array([
-        [1.0, 0.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, 0.0],
-        [0.0, 0.0, 0.0, 1.0]
-    ])
-
-    if theta_x_rad != 0.0:
-        sin = np.sin(theta_x_rad)
-        cos = np.cos(theta_x_rad)
-        rot_matrix @= np.array([
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, cos, -sin, 0.0],
-            [0.0, sin, cos, 0.0],
-            [0.0, 0.0, 0.0, 1.0]
-        ])
-    if theta_y_rad != 0.0:
-        sin = np.sin(theta_y_rad)
-        cos = np.cos(theta_y_rad)
-        rot_matrix @= np.array([
-            [cos, 0.0, sin, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [-sin, 0.0, cos, 0.0],
-            [0.0, 0.0, 0.0, 1.0]
-        ])
-    if theta_z_rad != 0.0:
-        sin = np.sin(theta_z_rad)
-        cos = np.cos(theta_z_rad)
-        rot_matrix @= np.array([
-            [cos, -sin, 0.0, 0.0],
-            [sin, cos, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0]
-        ])
-
-    return rot_matrix
+def rotation_z_matrix(rad) -> npt.NDArray:
+    c, s = math.cos(rad), math.sin(rad)
+    return np.array([
+        [c, -s, 0, 0],
+        [s, c, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
+    ], dtype=np.float32)
 
 def model_matrix(
     scale_x: float = 1.0,
     scale_y: float = 1.0,
     scale_z: float = 1.0,
-    rot_x_deg: float = 0.0,
     rot_x_rad: float = 0.0,
-    rot_y_deg: float = 0.0,
     rot_y_rad: float = 0.0,
-    rot_z_deg: float = 0.0,
     rot_z_rad: float = 0.0,
     trans_x: float = 0.0,
     trans_y: float = 0.0,
     trans_z: float = 0.0
 ) -> npt.NDArray:
     model = scale_matrix(scale_x, scale_y, scale_z)
-    if (
-        rot_x_deg != 0.0 or rot_x_rad != 0.0 or
-        rot_y_deg != 0.0 or rot_y_rad != 0.0 or
-        rot_z_deg != 0.0 or rot_z_rad != 0.0
-    ):
-        model @= rotation_matrix(rot_x_deg, rot_x_rad, rot_y_deg, rot_y_rad, rot_z_deg, rot_z_rad)
-    if trans_x != 0.0 or trans_y != 0.0 or trans_z != 0.0:
-        model @= translation_matrix(trans_x, trans_y, trans_z)
+    model @= rotation_z_matrix(rot_z_rad) @ rotation_y_matrix(rot_y_rad) @ rotation_x_matrix(rot_x_rad)    
+    model @= translation_matrix(trans_x, trans_y, trans_z)
+
     return model
 
-def view_matrix(
-    camera_x: float = 0.0,
-    camera_y: float = 0.0,
-    camera_z: float = 0.0,
-    rot_x_deg: float = 0.0,
-    rot_x_rad: float = 0.0,
-    rot_y_deg: float = 0.0,
-    rot_y_rad: float = 0.0,
-    rot_z_deg: float = 0.0,
-    rot_z_rad: float = 0.0
-) -> npt.NDArray:
-    view = translation_matrix(-camera_x, -camera_y, -camera_z)
-    if (
-        rot_x_deg != 0.0 or rot_x_rad != 0.0 or
-        rot_y_deg != 0.0 or rot_y_rad != 0.0 or
-        rot_z_deg != 0.0 or rot_z_rad != 0.0
-    ):
-        view @= rotation_matrix(rot_x_deg, rot_x_rad, rot_y_deg, rot_y_rad, rot_z_deg, rot_z_rad)
-    return view
-
 def projection_matrix(
-    fov_y_deg: float = 0.0,
     fov_y_rad: float = 0.0,
     aspect_ratio: float = 4/3,
     z_near: float = 0.1,
@@ -175,12 +107,6 @@ def projection_matrix(
 ) -> npt.NDArray:
     assert aspect_ratio > 0.0, "aspect_ratio must be > 0"
     assert 0 <= z_near < z_far, "z_near must be >= 0 and z_far must be > z_near"
-
-    # convert input to radians
-    assert (fov_y_deg > 0.0) != (fov_y_rad > 0.0), "Exactly one field of view input must be provided"
-    if fov_y_rad == 0.0:
-        fov_y_rad = fov_y_deg * np.pi / 180.0
-
     factor_y = 1 / (np.tan(fov_y_rad / 2))
 
     return np.array([
@@ -189,74 +115,6 @@ def projection_matrix(
         [0.0, 0.0, (z_far + z_near) / (z_near - z_far), (2 * z_near * z_far) / (z_near - z_far)],
         [0.0, 0.0, -1.0, 0.0]
     ])
-
-def create_mvp_matrix(rotation_angle):
-    """Model-View-Projection 행렬 생성"""
-    # 모델 행렬 (회전)
-    angle_rad = math.radians(rotation_angle)
-
-
-    cos_a = math.cos(angle_rad)
-    sin_a = math.sin(angle_rad)
-
-    # Y축 회전
-    rotation_y = np.array([
-        [cos_a, 0, sin_a, 0],
-        [0, 1, 0, 0],
-        [-sin_a, 0, cos_a, 0],
-        [0, 0, 0, 1]
-    ], dtype=np.float32)
-
-    # X축 회전 (약간)
-    angle_x = math.radians(rotation_angle * 0.5)
-    cos_x = math.cos(angle_x)
-    sin_x = math.sin(angle_x)
-    rotation_x = np.array([
-        [1, 0, 0, 0],
-        [0, cos_x, -sin_x, 0],
-        [0, sin_x, cos_x, 0],
-        [0, 0, 0, 1]
-    ], dtype=np.float32)
-
-    model = rotation_y @ rotation_x
-
-    # 뷰 행렬 (카메라를 z축 뒤로 이동)
-    view = np.array([
-        [1, 0, 0, 0],
-        [0, 1, 0, 0],
-        [0, 0, 1, -3],
-        [0, 0, 0, 1]
-    ], dtype=np.float32)
-
-    # 투영 행렬 (원근 투영)
-    fov = math.radians(45)
-    aspect = SCREEN_WIDTH / SCREEN_HEIGHT
-    near, far = 0.1, 50.0
-
-    f = 1.0 / math.tan(fov / 2.0)
-    projection = np.array([
-        [f / aspect, 0, 0, 0],
-        [0, f, 0, 0],
-        [0, 0, (far + near) / (near - far), (2 * far * near) / (near - far)],
-        [0, 0, -1, 0]
-    ], dtype=np.float32)
-
-    mvp = projection @ view @ model
-
-    # # model = model_matrix(rot_x_rad=angle_rad*0.5, rot_y_rad=angle_rad)
-    # model = model_matrix(rot_y_rad=angle_rad)
-    # view = view_matrix(camera_z=3, camera_y=0.5)
-    # # view = view_matrix()
-    # projection = projection_matrix(fov_y_rad=fov, 
-    #                                aspect_ratio=aspect, 
-    #                                z_near=near,
-    #                                z_far=far)
-    
-    # mvp = projection @ view @ model
-
-
-
-    return mvp
 
 def create_cube_vao():
     """색상이 있는 큐브 VAO 생성"""
@@ -351,6 +209,16 @@ def main():
 
     clock = pygame.time.Clock()
     running = True
+
+    camera_x = camera_y = camera_z = 0
+    camera_z = 3
+
+    fov = math.radians(45)
+    aspect = SCREEN_WIDTH / SCREEN_HEIGHT
+    near, far = 0.1, 50.0
+
+    f = 1.0 / math.tan(fov / 2.0)
+
     rotation = 0
 
     while running:
@@ -365,14 +233,17 @@ def main():
         rotation += 1
 
         # MVP 행렬 생성
-        mvp = create_mvp_matrix(rotation)
+        model = model_matrix(rot_y_rad = math.radians(rotation))
+        view = translation_matrix(-camera_x, -camera_y, -camera_z)
+        projection = projection_matrix(fov, aspect, near, far )
+
+        mvp = projection @ view @ model
 
         # 렌더링
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glUseProgram(shader)
 
         glUniformMatrix4fv(mvp_loc, 1, GL_TRUE, mvp)
-        # glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, mvp)
 
         # 큐브 그리기
         glBindVertexArray(cube_vao)
