@@ -40,7 +40,12 @@ void main()
 """
 
 def scale_matrix(s_x: float, s_y: float, s_z: float) -> npt.NDArray:
-    return np.identity(4)
+    return np.array([
+        [s_x, 0.0, 0.0, 0.0],
+        [0.0, s_y, 0.0, 0.0],
+        [0.0, 0.0, s_z, 0.0],
+        [0.0, 0.0, 0.0, 1.0]
+    ])
 
 def translation_matrix(t_x: float, t_y: float, t_z: float) -> npt.NDArray:
     return np.array([
@@ -56,7 +61,12 @@ def rotation_x_matrix(rad) -> npt.NDArray:
 
 def rotation_y_matrix(rad) -> npt.NDArray:
     c, s = math.cos(rad), math.sin(rad)
-    return np.identity(4)
+    return np.array([
+        [c, 0.0, s, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [-s, 0.0, c, 0.0],
+        [0.0, 0.0, 0.0, 1.0]
+    ])
 
 def rotation_z_matrix(rad) -> npt.NDArray:
     c, s = math.cos(rad), math.sin(rad)
@@ -210,10 +220,17 @@ def main():
                     running = False
 
         # 회전
-        rotation += 1
+        # rotation += 1
 
         # MVP 행렬 생성
-        model = model_matrix(rot_y_rad = math.radians(rotation))
+        # model = model_matrix(scale_y = 2.0, rot_y_rad = math.radians(45))
+        # model = model_matrix(rot_y_rad = math.radians(45))
+        rot = rotation_y_matrix(math.radians(90))
+        trans = translation_matrix(1,0,0)
+
+        model = trans @ rot
+        #model = rot @ trans
+                
         view = translation_matrix(-camera_x, -camera_y, -camera_z)
         projection = projection_matrix(fov, aspect, near, far )
 
