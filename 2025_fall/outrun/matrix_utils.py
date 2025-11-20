@@ -99,7 +99,42 @@ def create_view_matrix(camera_pos, yaw, pitch):
     # 회전 (카메라 회전의 역)
     view = create_rotation_y_matrix(-yaw) @ view
     view = create_rotation_x_matrix(-pitch) @ view
-    
+
+    return view
+
+def create_view_matrix_lookat(eye, at, up):
+    """뷰 행렬 생성 (look-at 방식)
+
+    Args:
+        eye: 카메라 위치 (3D 벡터)
+        at: 카메라가 보는 지점 (3D 벡터)
+        up: 카메라 상향 벡터 (3D 벡터)
+
+    Returns:
+        4x4 뷰 행렬
+    """
+    eye = np.array(eye, dtype=np.float32)
+    at = np.array(at, dtype=np.float32)
+    up = np.array(up, dtype=np.float32)
+
+    # 카메라 좌표계 구성
+    # z축: eye에서 at으로 가는 방향의 반대 (카메라는 -z 방향을 바라봄)
+    z_axis = normalize(eye - at)
+
+    # x축: up과 z축의 외적
+    x_axis = normalize(np.cross(up, z_axis))
+
+    # y축: z축과 x축의 외적
+    y_axis = np.cross(z_axis, x_axis)
+
+    # 뷰 행렬 구성 (회전 + 이동)
+    view = np.array([
+        [x_axis[0], x_axis[1], x_axis[2], -np.dot(x_axis, eye)],
+        [y_axis[0], y_axis[1], y_axis[2], -np.dot(y_axis, eye)],
+        [z_axis[0], z_axis[1], z_axis[2], -np.dot(z_axis, eye)],
+        [0, 0, 0, 1]
+    ], dtype=np.float32)
+
     return view
 
 def create_projection_matrix(fov_degrees, aspect_ratio, near, far):
