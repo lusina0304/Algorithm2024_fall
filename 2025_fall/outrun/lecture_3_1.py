@@ -88,6 +88,41 @@ void main()
 }
 """
 
+
+# HUD Vertex Shader (2D orthographic projection)
+HUD_VERTEX_SHADER = """
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec2 aTexCoord;
+
+out vec2 TexCoord;
+
+uniform mat4 projection;
+uniform mat4 model;
+
+void main()
+{
+    gl_Position = projection * model * vec4(aPos, 1.0);
+    TexCoord = aTexCoord;
+}
+"""
+
+# HUD Fragment Shader
+HUD_FRAGMENT_SHADER = """
+#version 330 core
+in vec2 TexCoord;
+out vec4 FragColor;
+
+uniform sampler2D texture1;
+uniform float alpha;
+
+void main()
+{
+    vec4 texColor = texture(texture1, TexCoord);
+    FragColor = vec4(texColor.rgb, texColor.a * alpha);
+}
+"""
+
 def scale_matrix(s_x: float, s_y: float, s_z: float) -> npt.NDArray:
     return np.array([
         [s_x, 0.0, 0.0, 0.0],
@@ -116,9 +151,9 @@ def rotation_x_matrix(rad) -> npt.NDArray:
 def rotation_y_matrix(rad) -> npt.NDArray:
     c, s = math.cos(rad), math.sin(rad)
     return np.array([
-        [c, 0, -s, 0],
+        [c, 0, s, 0],
         [0, 1, 0, 0],
-        [s, 0, c, 0],
+        [-s, 0, c, 0],
         [0, 0, 0, 1]
     ], np.float32)
 
@@ -207,6 +242,15 @@ def projection_matrix(
         [0.0, 0.0, -1.0, 0.0]
     ])
 
+def create_ortho_matrix(left, right, bottom, top, near, far):
+    """직교 투영 행렬 생성 (2D용)"""
+    return np.array([
+        [2/(right-left), 0, 0, -(right+left)/(right-left)],
+        [0, 2/(top-bottom), 0, -(top+bottom)/(top-bottom)],
+        [0, 0, -2/(far-near), -(far+near)/(far-near)],
+        [0, 0, 0, 1]
+    ], dtype=np.float32)
+    
 def load_texture(filepath):
     """PNG 파일로부터 텍스처 로드"""
     image = Image.open(filepath)
@@ -223,6 +267,7 @@ def load_texture(filepath):
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
     return texture
+
 
 def create_cube_vao():
     """큐브 VAO 생성 (벽용)"""
@@ -354,28 +399,63 @@ def draw_terrain_from_grid(grid, cube_vao, quad_vao, wall_textures, floor_textur
                 glUniformMatrix4fv(model_loc, 1, GL_TRUE, model)
                 glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, None)
 
-def draw_enemy():
-    # Uniform 위치 가져오기
+# 적 그리기
+def draw_enemy(c_x, c_z, frame, textures, quad_vao, shader):
     model_loc = glGetUniformLocation(shader, "model")
-        tint_loc = glGetUniformLocation(shader, "tintColor")
+    tint_loc = glGetUniformLocation(shader, "tintColor")
 
-        # 현재 애니메이션 프레임 텍스처 바인딩
-        glBindTexture(GL_TEXTURE_2D, self.textures[self.current_frame])
-        glUniform3f(tint_loc, 1.0, 1.0, 1.0)
-        
-        # 빌보드 효과: 항상 플레이어를 향하도록 회전
-        model = create_model_matrix(
-            self.x,
-            self.y,
-            self.z,
-            scale=self.size,
-            rotate_y=math.degrees(self.yaw) - 90
-        )
-        glUniformMatrix4fv(model_loc, 1, GL_TRUE, model)
+    # 바닥 그리기
+    glBindVertexArray(quad_vao)
+    glBindTexture(GL_TEXTURE_2D, textures[int(frame / 15) % len(textures)])
+    glUniform3f(tint_loc, 1.0, 1.0, 1.0)
 
-        # 쿼드 렌더링
-        glBindVertexArray(quad_vao)
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
+    p_x = len(MAP[0]) / 2 - 0.5
+    p_z = len(MAP) / 2 - 0.5
+
+    angle = math.atan2(c_x - p_x, c_z - p_z)
+    
+    # 바닥을 XZ 평면에 그리기
+    model = translation_matrix(p_x , 0.5, p_z) @ \
+        rotation_y_matrix(angle) @ \
+        scale_matrix(1, 1, 1)
+    glUniformMatrix4fv(model_loc, 1, GL_TRUE, model)
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
+
+def draw_gun(frame, quad_vao, textures, hud_shader):
+    glUseProgram(hud_shader)
+    glDisable(GL_DEPTH_TEST)
+
+    # Uniform 위치 가져오기
+    model_loc = glGetUniformLocation(hud_shader, "model")
+    proj_loc = glGetUniformLocation(hud_shader, "projection")
+    alpha_loc = glGetUniformLocation(hud_shader, "alpha")
+
+    # Orthographic projection 설정
+
+
+    ortho_projection = create_ortho_matrix(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT, -1, 1)
+    glUniformMatrix4fv(proj_loc, 1, GL_TRUE, ortho_projection)
+    glUniform1f(alpha_loc, 1.0)
+
+    # 총 위치 설정
+    size = (300, 300)
+    position = ((SCREEN_WIDTH / 2), size[1] / 2)
+
+    gun_x = position[0]
+    gun_y = position[1]
+
+    # 현재 프레임에 맞는 텍스처 바인딩
+    glBindTexture(GL_TEXTURE_2D, textures[1])
+
+    # 모델 행렬 생성 (2D 평면)
+    model = translation_matrix(gun_x, gun_y, 0) @ scale_matrix(size[0], size[1], 1)
+    glUniformMatrix4fv(model_loc, 1, GL_TRUE, model)
+
+    # 쿼드 렌더링
+    glBindVertexArray(quad_vao)
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
+
+    glEnable(GL_DEPTH_TEST)
 
 def create_axis():
     vertices = np.array([
@@ -414,6 +494,9 @@ def main():
     # OpenGL 설정
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+    
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     glClearColor(0.2, 0.3, 0.3, 1.0)
 
@@ -428,11 +511,18 @@ def main():
         compileShader(LINE_VERTEX_SHADER, GL_VERTEX_SHADER),
         compileShader(LINE_FRAGMENT_SHADER, GL_FRAGMENT_SHADER)
     )
+    
+    # HUD 셰이더 컴파일
+    hud_shader = compileProgram(
+        compileShader(HUD_VERTEX_SHADER, GL_VERTEX_SHADER),
+        compileShader(HUD_FRAGMENT_SHADER, GL_FRAGMENT_SHADER)
+    )
 
     # VAO 생성
     cube_vao = create_cube_vao()
     quad_vao = create_quad_vao()
     enemy_quad_vao = create_quad_vao()
+    gun_quad_vao = create_quad_vao()
     axis_vao = create_axis()
 
     # 텍스처 로드
@@ -442,12 +532,18 @@ def main():
         3: load_texture("textures/wall3.png"),
     }
     floor_texture = load_texture("textures/floor.png")
-    enemy_textures = [
-        load_texture("textures/enemy_walk_1.png"),
-        load_texture("textures/enemy_walk_2.png"),
-        load_texture("textures/enemy_walk_3.png"),
-        load_texture("textures/enemy_walk_4.png")
-    ]
+    enemy_textures = {
+        0: load_texture("textures/enemy_walk_1.png"),
+        1: load_texture("textures/enemy_walk_2.png"),
+        2: load_texture("textures/enemy_walk_3.png"),
+        3: load_texture("textures/enemy_walk_4.png"),
+    }
+    gun_textures = {
+        0: load_texture("textures/gun_idle.png"),
+        1: load_texture("textures/gun_shoot1.png"),
+        2: load_texture("textures/gun_shoot2.png")
+    }
+
 
     # 유니폼 위치
     view_loc = glGetUniformLocation(shader, "view")
@@ -474,6 +570,9 @@ def main():
 
     f = 1.0 / math.tan(fov / 2.0)
 
+    frame = 0
+    yaw = 0
+    
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -482,27 +581,46 @@ def main():
                 if event.key == pygame.K_ESCAPE:
                     running = False
 
+        move_front = 0
+        move_right = 0
+        
         # 키보드 입력으로 카메라 이동
         keys = pygame.key.get_pressed()
         if keys[pygame.K_w]:  # 앞으로
-            camera_z -= camera_speed
+            move_front -= camera_speed
         if keys[pygame.K_s]:  # 뒤로
-            camera_z += camera_speed
+            move_front += camera_speed
         if keys[pygame.K_a]:  # 왼쪽으로
-            camera_x -= camera_speed
+            move_right -= camera_speed
         if keys[pygame.K_d]:  # 오른쪽으로
-            camera_x += camera_speed
-        if keys[pygame.K_q]:  # 위로
-            camera_y += camera_speed
-        if keys[pygame.K_e]:  # 아래로
-            camera_y -= camera_speed
+            move_right += camera_speed
+            
+        if keys[pygame.K_LEFT]:
+            yaw += 0.05
+        if keys[pygame.K_RIGHT]:
+            yaw -= 0.05
 
+        frame += 1
+        
         # MVP 행렬 생성
+        move = [move_right, 0, move_front, 0]
+        
+        delta = rotation_y_matrix(yaw) @ np.array(move)
+        
+        delta_x = delta[0]
+        delta_z = delta[2]
 
+        camera_x += delta_x
+        camera_z += delta_z
+        
         # 카메라는 항상 원점을 바라봄
-        eye = [camera_x, camera_y, camera_z]
-        at = [0, 0, 0]  # 원점을 바라봄
+        eye = [camera_x, 0.8, camera_z]
+        # at = [0, 0, 0]  # 원점을 바라봄
         up = [0, 1, 0]  # Y축이 위쪽
+        
+        view_dir = [0, 0, -1, 1]
+        at = (rotation_y_matrix(yaw) @ np.array(view_dir))[:3] + np.array(eye)
+        
         view = create_view_matrix_lookat(eye, at, up)
 
         projection = projection_matrix(fov, aspect, near, far )
@@ -516,6 +634,10 @@ def main():
         
         draw_terrain_from_grid(MAP, cube_vao, quad_vao, wall_textures, floor_texture, shader)
         
+        draw_enemy(camera_x, camera_z, frame, enemy_textures, enemy_quad_vao, shader)
+
+        # HUD
+        draw_gun(frame, gun_quad_vao, gun_textures, hud_shader)
 
         # 축 렌더링 (라인 셰이더 사용)
         glUseProgram(line_shader)
