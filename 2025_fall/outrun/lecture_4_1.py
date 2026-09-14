@@ -535,7 +535,6 @@ class Enemy:
         self.frame = 0
         self.hp = 50
         self.max_hp = 50
-        self.radius = 0.5  # 충돌 판정용 반지름
 
         # 상태 관리
         self.is_hit = False  # 피격 상태
